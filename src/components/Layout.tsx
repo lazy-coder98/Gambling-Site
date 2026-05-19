@@ -49,6 +49,7 @@ export function Layout({ children, wallet, audio, activeTab, setActiveTab, onOpe
           <div style={styles.logo} onClick={() => handleNavClick('lobby')}>
             <span style={styles.logoBadge}>✦</span>
             <h1 style={styles.logoText}>NEXT<span>SPIN</span></h1>
+            <span style={styles.byAuthor}>by Mohit Verma</span>
           </div>
         </div>
 
@@ -92,6 +93,7 @@ export function Layout({ children, wallet, audio, activeTab, setActiveTab, onOpe
             <div style={styles.logoSmall}>
               <span style={styles.logoBadge}>✦</span>
               <span style={{ fontWeight: 800, fontSize: '1rem', fontFamily: 'var(--font-display)' }}>NEXTSPIN</span>
+              <span style={styles.byAuthor}>by Mohit Verma</span>
             </div>
             <button style={styles.closeSidebarBtn} onClick={() => setSidebarOpen(false)}>
               <X size={18} />
@@ -214,6 +216,16 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 800,
     fontFamily: 'var(--font-display)',
     letterSpacing: '0.05em',
+  },
+  byAuthor: {
+    fontSize: '0.6rem',
+    color: 'var(--text-muted)',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    marginLeft: '6px',
+    marginTop: '4px',
+    whiteSpace: 'nowrap',
   },
   headerRight: {
     display: 'flex',
