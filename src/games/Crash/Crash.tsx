@@ -26,6 +26,23 @@ interface Particle {
   maxLife: number;
 }
 
+const COLORS = {
+  primary: '#8b5cf6',
+  accent: '#d946ef',
+  success: '#10b981',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  textSecondary: '#94a3b8',
+  bgDeep: '#090714',
+  bgSpace: '#0d0a1f',
+  bgSurface: '#14112a',
+};
+
+const FONTS = {
+  sans: "'Inter', system-ui, -apple-system, sans-serif",
+  display: "'Outfit', sans-serif",
+};
+
 export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncrementNonce }: CrashProps) {
   const [betAmount, setBetAmount] = useState('100');
   const [autoCashout, setAutoCashout] = useState('2.00');
@@ -55,6 +72,123 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
   // Sound ticking throttle
   const lastTickMultiplierRef = useRef(1.00);
 
+  // Refs to prevent stale closures inside animation frame loops
+  const hasBetRef = useRef(hasBet);
+  const playerStatusRef = useRef(playerStatus);
+  const betPlacedAmountRef = useRef(betPlacedAmount);
+  const autoCashoutRef = useRef(autoCashout);
+
+  useEffect(() => { hasBetRef.current = hasBet; }, [hasBet]);
+  useEffect(() => { playerStatusRef.current = playerStatus; }, [playerStatus]);
+  useEffect(() => { betPlacedAmountRef.current = betPlacedAmount; }, [betPlacedAmount]);
+  useEffect(() => { autoCashoutRef.current = autoCashout; }, [autoCashout]);
+
+  // Clean up canvas animations on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
+    };
+  }, []);
+
+  const drawLobbyCanvas = (timeRemaining: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw Dark Cyber Space Radial Background
+    const radGrad = ctx.createRadialGradient(width/2, height/2, 10, width/2, height/2, width);
+    radGrad.addColorStop(0, '#100c2a');
+    radGrad.addColorStop(1, '#070514');
+    ctx.fillStyle = radGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw static grid lines
+    ctx.strokeStyle = 'rgba(139, 92, 246, 0.03)';
+    ctx.lineWidth = 1.5;
+    for (let x = 0; x < width; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < height; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    // Rocket on launch pad at origin (50, height - 50)
+    const originX = 50;
+    const originY = height - 50;
+
+    ctx.save();
+    ctx.translate(originX, originY);
+    ctx.rotate(0); // resting
+
+    // Glowing thruster body
+    const rG = ctx.createLinearGradient(-15, -6, 15, 6);
+    rG.addColorStop(0, COLORS.accent);
+    rG.addColorStop(1, COLORS.primary);
+    ctx.fillStyle = rG;
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 16, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Red nose cap
+    ctx.fillStyle = COLORS.danger;
+    ctx.beginPath();
+    ctx.moveTo(12, -5);
+    ctx.quadraticCurveTo(22, 0, 12, 5);
+    ctx.fill();
+
+    // Wings
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-8, -6);
+    ctx.lineTo(-14, -12);
+    ctx.lineTo(-2, -6);
+    ctx.moveTo(-8, 6);
+    ctx.lineTo(-14, 12);
+    ctx.lineTo(-2, 6);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Launch Pad guide line
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(20, originY + 10);
+    ctx.lineTo(80, originY + 10);
+    ctx.stroke();
+
+    // Draw real-time countdown multiplier/seconds right on the canvas!
+    ctx.fillStyle = '#fff';
+    ctx.font = `800 3.2rem ${FONTS.display}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(255,255,255,0.2)';
+    ctx.fillText(`${timeRemaining.toFixed(1)}s`, width / 2, height / 2 - 20);
+    ctx.shadowBlur = 0;
+
+    // Draw tiny guide text
+    ctx.fillStyle = COLORS.textSecondary;
+    ctx.font = `600 0.85rem ${FONTS.sans}`;
+    ctx.fillText("PREPARING LAUNCH", width / 2, height / 2 + 20);
+  };
+
   // 1. Core loop state manager
   useEffect(() => {
     let lobbyInterval: any = null;
@@ -72,11 +206,16 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
       setMultiplier(1.00);
       setWonAmount(0);
 
+      // Render initial frame immediately
+      drawLobbyCanvas(5.0);
+
       const start = Date.now();
       lobbyInterval = setInterval(() => {
         const elapsed = (Date.now() - start) / 1000;
         const remaining = Math.max(0, 5.0 - elapsed);
         setTimeToStart(Number(remaining.toFixed(1)));
+        
+        drawLobbyCanvas(remaining);
         
         if (remaining <= 0) {
           clearInterval(lobbyInterval);
@@ -99,7 +238,7 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
     setMultiplier(1.00);
     lastTickMultiplierRef.current = 1.00;
 
-    if (hasBet) {
+    if (hasBetRef.current) {
       setPlayerStatus('betting');
     }
 
@@ -136,8 +275,8 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
     }
 
     // Check Auto-Cashout
-    const autoTarget = parseFloat(autoCashout);
-    if (hasBet && playerStatus === 'betting' && !isNaN(autoTarget) && clampedMult >= autoTarget) {
+    const autoTarget = parseFloat(autoCashoutRef.current);
+    if (hasBetRef.current && playerStatusRef.current === 'betting' && !isNaN(autoTarget) && clampedMult >= autoTarget) {
       cashOut(clampedMult);
     }
 
@@ -195,7 +334,7 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
     // Draw beautiful neon exponential line
     ctx.shadowBlur = 15;
     ctx.shadowColor = 'rgba(217, 70, 239, 0.5)';
-    ctx.strokeStyle = 'var(--primary)';
+    ctx.strokeStyle = COLORS.primary;
     ctx.lineWidth = 5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -219,7 +358,7 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
         y: rocketY + 2,
         vx: -2 - Math.random() * 4,
         vy: (Math.random() - 0.5) * 3,
-        color: Math.random() < 0.6 ? 'var(--accent)' : 'var(--danger)',
+        color: Math.random() < 0.6 ? COLORS.accent : COLORS.danger,
         size: 2 + Math.random() * 4,
         life: 0,
         maxLife: 20 + Math.random() * 20
@@ -250,8 +389,8 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
 
     // Rocket glowing thruster body
     const rG = ctx.createLinearGradient(-15, -6, 15, 6);
-    rG.addColorStop(0, 'var(--accent)');
-    rG.addColorStop(1, 'var(--primary)');
+    rG.addColorStop(0, COLORS.accent);
+    rG.addColorStop(1, COLORS.primary);
     ctx.fillStyle = rG;
 
     // Body capsule path
@@ -260,14 +399,14 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
     ctx.fill();
 
     // Red nose cap
-    ctx.fillStyle = 'var(--danger)';
+    ctx.fillStyle = COLORS.danger;
     ctx.beginPath();
     ctx.moveTo(12, -5);
     ctx.quadraticCurveTo(22, 0, 12, 5);
     ctx.fill();
 
     // Wings
-    ctx.strokeStyle = 'var(--accent)';
+    ctx.strokeStyle = COLORS.accent;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(-8, -6);
@@ -282,7 +421,7 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
 
     // Display real-time flight multiplier in giant text right on the canvas!
     ctx.fillStyle = '#fff';
-    ctx.font = "800 3.2rem var(--font-display)";
+    ctx.font = `800 3.2rem ${FONTS.display}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowBlur = 10;
@@ -291,8 +430,8 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
     ctx.shadowBlur = 0;
 
     // Draw tiny guide text
-    ctx.fillStyle = 'var(--text-secondary)';
-    ctx.font = "600 0.85rem var(--font-sans)";
+    ctx.fillStyle = COLORS.textSecondary;
+    ctx.font = `600 0.85rem ${FONTS.sans}`;
     ctx.fillText("FLIGHT IN PROGRESS", width / 2, height / 2 + 20);
 
     animationFrameIdRef.current = requestAnimationFrame(renderLoop);
@@ -302,7 +441,7 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
     audio.playExplosion();
     setGameState('crashed');
     
-    if (hasBet && playerStatus === 'betting') {
+    if (hasBetRef.current && playerStatusRef.current === 'betting') {
       setPlayerStatus('lost');
     }
 
@@ -320,14 +459,14 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
     ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = 'var(--danger)';
-    ctx.font = "800 3.5rem var(--font-display)";
+    ctx.fillStyle = COLORS.danger;
+    ctx.font = `800 3.5rem ${FONTS.display}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`CRASHED @ ${crashValue.toFixed(2)}x`, canvas.width / 2, canvas.height / 2 - 10);
 
-    ctx.fillStyle = 'var(--text-secondary)';
-    ctx.font = "600 0.9rem var(--font-sans)";
+    ctx.fillStyle = COLORS.textSecondary;
+    ctx.font = `600 0.9rem ${FONTS.sans}`;
     ctx.fillText("LOBBY COOLDOWN STARTING...", canvas.width / 2, canvas.height / 2 + 35);
 
     // Automatically queue next lobby round in 3.5 seconds
@@ -357,10 +496,10 @@ export function Crash({ wallet, audio, serverSeed, clientSeed, nonce, onIncremen
   };
 
   const cashOut = (exitMult: number) => {
-    if (!hasBet || playerStatus !== 'betting') return;
+    if (!hasBetRef.current || playerStatusRef.current !== 'betting') return;
     audio.playClick();
 
-    const payout = betPlacedAmount * exitMult;
+    const payout = betPlacedAmountRef.current * exitMult;
     
     wallet.credit(payout, `Crash Cashout (${exitMult}x)`);
     setWonAmount(payout);
