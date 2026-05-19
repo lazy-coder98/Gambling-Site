@@ -93,7 +93,7 @@ export function Layout({ children, wallet, audio, activeTab, setActiveTab, onOpe
             <div style={styles.logoSmall}>
               <span style={styles.logoBadge}>✦</span>
               <span style={{ fontWeight: 800, fontSize: '1rem', fontFamily: 'var(--font-display)' }}>NEXTSPIN</span>
-              <span style={styles.byAuthor}>by Mohit Verma</span>
+              <span style={styles.byAuthor}></span>
             </div>
             <button style={styles.closeSidebarBtn} onClick={() => setSidebarOpen(false)}>
               <X size={18} />
